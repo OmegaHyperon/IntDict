@@ -4,7 +4,6 @@
 
 import array
 import bisect
-from pympler import asizeof
 from typing import Optional, Generator
 import datetime
 
@@ -212,5 +211,7 @@ if __name__ == '__main__':
         d.get(3)
     print('test of dict: ', (datetime.datetime.now() - df).total_seconds())
 
+    # Size in memory
+    from pympler import asizeof
     print('size in memory: ', asizeof.asizeof(idict), '/', asizeof.asizeof(d))
 
