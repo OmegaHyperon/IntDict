@@ -1,13 +1,17 @@
-import os
+"""
+    Dictionary with low memory consumption
+"""
+
 import array
 import bisect
 from pympler import asizeof
-from typing import Optional
+from typing import Optional, Generator
 import datetime
 
 
 class IntDict(object):
     def __init__(self):
+        self._len_f_header: int = 8
         self._k: array.array = array.array('L')
         self._v: array.array = array.array('L')
 
@@ -17,11 +21,11 @@ class IntDict(object):
     def __len__(self):
         return len(self._k)
 
-    def __getitem__(self, k: int):
-        if k > len(self._k):
+    def __getitem__(self, i: int):
+        if i > len(self._k) - 1:
             raise IndexError
-
-        return self.get(k)
+        else:
+            return self._k[i]
 
     def clear(self) -> None:
         """
@@ -59,25 +63,26 @@ class IntDict(object):
             self._k.insert(i, k)
             self._v.insert(i, v)
 
-    def keys(self) -> list:
+    def keys(self) -> Generator:
         """
-        Список ключей словаря
-
-        :return: list
+        Последовательность ключей словаря
         """
-        return list(self._k)
+        for k in self._k:
+            yield k
 
-    def values(self) -> list:
+    def values(self) -> Generator:
         """
-        Список значений словаря
-
-        :return: list
+        Последовательность значений словаря
         """
+        for v in self._v:
+            yield v
 
-        return list(self._v)
-
-    def items(self) -> list:
-        return [(self._k[i], self._v[i]) for i in range(len(self._k))]
+    def items(self) -> Generator:
+        """
+        Последовательность пар ключ-значение
+        """
+        for i in range(len(self._k)):
+            yield self._k[i], self._v[i]
 
     def get(self, k: int, default: Optional[int] = None) -> Optional[int]:
         """
@@ -136,8 +141,8 @@ class IntDict(object):
 
     def to_file(self, f_name: str):
         kb = self._k.tobytes()
-        vb = self._k.tobytes()
-        data: bytes = len(kb).to_bytes(8, 'big') + kb + vb
+        vb = self._v.tobytes()
+        data: bytes = len(kb).to_bytes(self._len_f_header, 'big') + kb + vb
         with open(f_name, 'wb') as f:
             f.write(data)
 
@@ -147,52 +152,56 @@ class IntDict(object):
         with open(f_name, 'rb') as f:
             data = f.read()
 
-        l_data: int = int.from_bytes(data[:8], 'big')
-        k_data: bytes = data[8:l_data+8]
-        v_data: bytes = data[8+l_data:8+l_data*2]
-        self._k.frombytes(k_data)
-        self._v.frombytes(v_data)
+        if len(data) > 0:
+            l_data: int = int.from_bytes(data[:self._len_f_header], 'big')
+            self._k.frombytes(data[self._len_f_header:l_data + self._len_f_header])
+            self._v.frombytes(data[self._len_f_header + l_data:self._len_f_header + l_data*2])
+
+            if len(self._k) != len(self._v):
+                self.clear()
+                raise AssertionError
+        else:
+            raise EOFError
 
 
 if __name__ == '__main__':
     idict = IntDict()
     d = dict()
 
-    total_cnt = 40000000
+    total_cnt = 1000
 
     df = datetime.datetime.now()
     for i in range(total_cnt):
         idict.update({i: i*10})
-    print('fill of idict: ', (datetime.datetime.now() - df).total_seconds())
-    print('len=', len(idict), '; k, v:', len(idict._k), len(idict._v))
+    print('idict filling time: ', (datetime.datetime.now() - df).total_seconds())
+    # print('idict=', idict)
 
     df = datetime.datetime.now()
     for i in range(total_cnt):
         d[i] = i
-    print('fill of d: ', (datetime.datetime.now() - df).total_seconds())
-    print(idict[10])
+    print('dict filling time ', (datetime.datetime.now() - df).total_seconds())
 
+    f_name = 'aaa.bin'
     df = datetime.datetime.now()
-    idict.to_file('aaa.bin')
-    print('save: ', (datetime.datetime.now() - df).total_seconds())
+    idict.to_file(f_name)
+    print('saving time: ', (datetime.datetime.now() - df).total_seconds())
     idict.clear()
     df = datetime.datetime.now()
-    idict.from_file('aaa.bin')
-    print('load: ', (datetime.datetime.now() - df).total_seconds())
-    print(len(idict))
+    idict.from_file(f_name)
+    print('loading time: ', (datetime.datetime.now() - df).total_seconds())
+    # print('idict=', idict)
 
-    test_ses = 1
-
-    df = datetime.datetime.now()
-    for i in range(test_ses):
-        idict.get(300)
-    print('time of idict: ', (datetime.datetime.now() - df).total_seconds())
+    test_ses = 1000
 
     df = datetime.datetime.now()
     for i in range(test_ses):
-        d.get(300)
-    print('time of d: ', (datetime.datetime.now() - df).total_seconds())
+        idict.get(3)
+    print('test time of idict: ', (datetime.datetime.now() - df).total_seconds())
 
-    print('Size in memory: ', asizeof.asizeof(idict), asizeof.asizeof(d))
+    df = datetime.datetime.now()
+    for i in range(test_ses):
+        d.get(3)
+    print('test of dict: ', (datetime.datetime.now() - df).total_seconds())
 
+    print('size in memory: ', asizeof.asizeof(idict), '/', asizeof.asizeof(d))
 
