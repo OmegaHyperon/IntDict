@@ -1,6 +1,6 @@
 # IntDict
 
-Dictionary with low memory consumption
+Dictionary with low memory consumption  
 Type of data: only unsigned integer, 4 bytes
 
 # Examples
