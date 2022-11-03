@@ -170,6 +170,7 @@ if __name__ == '__main__':
 
     total_cnt = 1000
 
+    # Filling
     df = datetime.datetime.now()
     for i in range(total_cnt):
         idict.update({i: i*10})
@@ -181,6 +182,13 @@ if __name__ == '__main__':
         d[i] = i
     print('dict filling time ', (datetime.datetime.now() - df).total_seconds())
 
+    # Search
+    s = 30
+    i = idict.get(s)
+    v = idict.get(i) if i is not None else None
+    print(f'search for k={s}: index={i}, value={v}')
+
+    # Saving and loading
     f_name = 'aaa.bin'
     df = datetime.datetime.now()
     idict.to_file(f_name)
@@ -191,6 +199,7 @@ if __name__ == '__main__':
     print('loading time: ', (datetime.datetime.now() - df).total_seconds())
     # print('idict=', idict)
 
+    # Time tests
     test_ses = 1000
 
     df = datetime.datetime.now()
