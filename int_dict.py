@@ -1,5 +1,6 @@
 """
     Dictionary with low memory consumption
+    Type of data: only unsigned integer, 4 bytes
 """
 
 import array
@@ -46,22 +47,6 @@ class IntDict(object):
         self._v.pop(i)
         return self._k.pop(i)
 
-    def append(self, k: int, v: int) -> None:
-        """
-        Добавить элемент в словарь
-
-        :param k: - ключ
-        :param v: - значение
-        :return:
-        """
-
-        i: int = bisect.bisect_left(self._k, k)
-        if i < len(self._k) and self._k[i] == k:
-            self._v[i] = v
-        else:
-            self._k.insert(i, k)
-            self._v.insert(i, v)
-
     def keys(self) -> Generator:
         """
         Последовательность ключей словаря
@@ -97,6 +82,18 @@ class IntDict(object):
 
         return res
 
+    def _sort(self) -> None:
+        tmp = [(k, i) for i, k in enumerate(self._k)]
+        tmp.sort(key=lambda x: x[0])
+
+        self._k = array.array('L')
+        self._v_new = array.array('L')
+        for item in tmp:
+            self._k.append(item[0])
+            self._v_new.append(self._v[item[1]])
+        self._v = self._v_new
+        del self._v_new
+
     def _index(self, k: int, lo: int, hi: int) -> Optional[int]:
         """
         Поиск индекса элемента по его ключу внутри выделенного диапазона
@@ -104,7 +101,7 @@ class IntDict(object):
         :param k: - ключ поиска
         :param lo: - начало диапазона поиска
         :param hi: - предел диапазона поиска
-        :return: - найденное значение
+        :return: Optional[int] - найденное значение
         """
 
         if lo <= hi:
@@ -126,7 +123,23 @@ class IntDict(object):
 
         return self._index(k, 0, len(self._k) - 1)
 
-    def update(self, data: dict) -> None:
+    def append(self, k: int, v: int) -> None:
+        """
+        Добавить элемент в словарь
+
+        :param k: - ключ
+        :param v: - значение
+        :return: None
+        """
+
+        i: int = bisect.bisect_left(self._k, k)
+        if i < len(self._k) and self._k[i] == k:
+            self._v[i] = v
+        else:
+            self._k.insert(i, k)
+            self._v.insert(i, v)
+
+    def extend(self, data: dict) -> None:
         """
         Слияние со словарем
 
@@ -135,17 +148,34 @@ class IntDict(object):
         """
 
         if data is not None and isinstance(data, dict):
-            for k in data.keys():
-                self.append(k, data[k])
+            if len(data) < 10**3:
+                for k in data.keys():
+                    self.append(k, data[k])
+                else:
+                    self._k.extend([item for item in data.keys()])
+                    self._v.extend([item for item in data.values()])
+                    idict._sort()
 
-    def to_file(self, f_name: str):
+    def to_file(self, f_name: str) -> None:
+        """
+        Запись данных в файл
+
+        :param f_name: - имя файла
+        :return: None
+        """
         kb = self._k.tobytes()
         vb = self._v.tobytes()
         data: bytes = len(kb).to_bytes(self._len_f_header, 'big') + kb + vb
         with open(f_name, 'wb') as f:
             f.write(data)
 
-    def from_file(self, f_name: str):
+    def from_file(self, f_name: str) -> None:
+        """
+        Загрузка данных из файла
+
+        :param f_name: - имя файла
+        :return: None
+        """
         self.clear()
 
         with open(f_name, 'rb') as f:
@@ -165,53 +195,52 @@ class IntDict(object):
 
 if __name__ == '__main__':
     idict = IntDict()
-    d = dict()
 
-    total_cnt = 1000
+    from time_it import timeit
 
-    # Filling
-    df = datetime.datetime.now()
-    for i in range(total_cnt):
-        idict.update({i: i*10})
-    print('idict filling time: ', (datetime.datetime.now() - df).total_seconds())
-    # print('idict=', idict)
+    @timeit('')
+    def extend():
+        global idict
+        total_cnt = 1 * 10**1
 
-    df = datetime.datetime.now()
-    for i in range(total_cnt):
-        d[i] = i
-    print('dict filling time ', (datetime.datetime.now() - df).total_seconds())
+        import random
+        r_list = random.sample(range(1, total_cnt+1), total_cnt)
+        r_list = {i: i*10 for i in r_list}
+
+        # Filling
+        idict.extend(r_list)
+
+        # idict._sort()
+    extend()
+    #print(idict)
+    print('len=', len(idict))
 
     # Search
     s = 30
-    i = idict.get(s)
-    v = idict.get(i) if i is not None else None
-    print(f'search for k={s}: index={i}, value={v}')
+    v = idict.get(s)
+    print(f'idict: search for k={s}: index={v}')
 
-    # Saving and loading
-    f_name = 'aaa.bin'
-    df = datetime.datetime.now()
-    idict.to_file(f_name)
-    print('saving time: ', (datetime.datetime.now() - df).total_seconds())
-    idict.clear()
-    df = datetime.datetime.now()
-    idict.from_file(f_name)
-    print('loading time: ', (datetime.datetime.now() - df).total_seconds())
-    # print('idict=', idict)
+    @timeit('')
+    def save_load():
+        # Saving and loading
+        f_name = 'aaa.bin'
+        idict.to_file(f_name)
+        idict.clear()
+        idict.from_file(f_name)
+    save_load()
+    # print(idict)
 
     # Time tests
-    test_ses = 1000
+    test_ses = 100
 
-    df = datetime.datetime.now()
-    for i in range(test_ses):
-        idict.get(3)
-    print('test time of idict: ', (datetime.datetime.now() - df).total_seconds())
+    @timeit('')
+    def search():
+        for i in range(test_ses):
+            idict.get(300)
+    search()
 
-    df = datetime.datetime.now()
-    for i in range(test_ses):
-        d.get(3)
-    print('test of dict: ', (datetime.datetime.now() - df).total_seconds())
-
-    # Size in memory
-    from pympler import asizeof
-    print('size in memory: ', asizeof.asizeof(idict), '/', asizeof.asizeof(d))
-
+    def mem():
+        # Size in memory
+        from pympler import asizeof
+        print('size in memory: ', asizeof.asizeof(idict))
+    mem()
