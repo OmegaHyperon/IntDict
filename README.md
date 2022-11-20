@@ -12,7 +12,7 @@ Type of data: only unsigned integer, 4 bytes
     # Filling
     df = datetime.datetime.now()
     for i in range(total_cnt):
-        idict.update({i: i*10})
+        idict.append(i, i*10)
     print('idict filling time: ', (datetime.datetime.now() - df).total_seconds())
     # print('idict=', idict)
 
@@ -23,9 +23,8 @@ Type of data: only unsigned integer, 4 bytes
 
     # Search
     s = 30
-    i = idict.get(s)
-    v = idict.get(i) if i is not None else None
-    print(f'search for k={s}: index={i}, value={v}')
+    v = idict.get(s)
+    print(f'search for k={s}, value={v}')
 
     # Saving and loading
     f_name = 'aaa.bin'
