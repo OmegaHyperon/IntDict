@@ -5,6 +5,7 @@
 
 import array
 import bisect
+import traceback
 from typing import Optional, Generator
 import datetime
 
@@ -21,15 +22,23 @@ class IntDict(object):
     def __len__(self):
         return len(self._k)
 
-    def __getitem__(self, i: int):
-        if i > len(self._k) - 1:
+    def __getitem__(self, key: int):
+        i = self.index(key)
+        if i is None:
             raise IndexError
         else:
-            return self._k[i]
+            return self._v[i]
+
+    def __setitem__(self, key: int, val: int):
+        i = self.index(key)
+        if i is None:
+            self.append(key, val)
+        else:
+            self._v[i] = val
 
     def clear(self) -> None:
         """
-        Полная очистка словаря
+        Full dictionary cleaning
 
         :return: None
         """
@@ -39,7 +48,7 @@ class IntDict(object):
 
     def pop(self, i: int) -> int:
         """
-        Возвращает значение и удаляет элемент с индексом i
+        Returns a value and removes the element at index i
 
         :param i: int
         :return: int - значение элемента с индексом i
@@ -49,28 +58,28 @@ class IntDict(object):
 
     def keys(self) -> Generator:
         """
-        Последовательность ключей словаря
+        Sequence of dictionary keys
         """
         for k in self._k:
             yield k
 
     def values(self) -> Generator:
         """
-        Последовательность значений словаря
+        Sequence of dictionary values
         """
         for v in self._v:
             yield v
 
     def items(self) -> Generator:
         """
-        Последовательность пар ключ-значение
+        Sequence of key-value pairs
         """
         for i in range(len(self._k)):
             yield self._k[i], self._v[i]
 
     def get(self, k: int, default: Optional[int] = None) -> Optional[int]:
         """
-        Возвращает элемент по его ключу
+        Return an element by its key
 
         :param k: - ключевое значение поиска
         :param default: int - значение по умолчанию
@@ -96,11 +105,11 @@ class IntDict(object):
 
     def _index(self, k: int, lo: int, hi: int) -> Optional[int]:
         """
-        Поиск индекса элемента по его ключу внутри выделенного диапазона
+        Finding the index of an element by its key within the selected range
 
-        :param k: - ключ поиска
-        :param lo: - начало диапазона поиска
-        :param hi: - предел диапазона поиска
+        :param k: - key
+        :param lo: - start from
+        :param hi: - end of
         :return: Optional[int] - найденное значение
         """
 
@@ -115,7 +124,7 @@ class IntDict(object):
 
     def index(self, k) -> Optional[int]:
         """
-        Поиск индекса элемента по его ключу
+        Searching the index of an element by its key
 
         :param k: - ключ поиска
         :return: Optional[int] - результат поиска
@@ -123,42 +132,46 @@ class IntDict(object):
 
         return self._index(k, 0, len(self._k) - 1)
 
-    def append(self, k: int, v: int) -> None:
+    def append(self, k: int, v: int) -> bool:
         """
-        Добавить элемент в словарь
+        Add an element
 
         :param k: - ключ
         :param v: - значение
-        :return: None
+        :return: bool - item was inserted
         """
 
         i: int = bisect.bisect_left(self._k, k)
         if i < len(self._k) and self._k[i] == k:
             self._v[i] = v
+            res = False
         else:
             self._k.insert(i, k)
             self._v.insert(i, v)
+            res = True
+
+        return res
 
     def extend(self, data: dict) -> None:
         """
-        Слияние со словарем
+        Expand the storage with external list
 
-        :param data: - внешний словарь
+        :param data: - внешний словарь {key: val}
         :return: None
         """
 
         if data is not None and isinstance(data, dict):
-            if len(data) < 10**3:
-                for k in data.keys():
-                    self.append(k, data[k])
-                else:
-                    self._k.extend([item for item in data.keys()])
-                    self._v.extend([item for item in data.values()])
-                    idict._sort()
+            if len(data) < 10**6:
+                for item in data.items():
+                    i = self.index(item[0])
+                    if i is None:
+                        self.append(item[0], item[1])
+                    else:
+                        self[i] = item[1]
 
     def to_file(self, f_name: str) -> None:
         """
-        Запись данных в файл
+        Save into the file
 
         :param f_name: - имя файла
         :return: None
@@ -171,7 +184,7 @@ class IntDict(object):
 
     def from_file(self, f_name: str) -> None:
         """
-        Загрузка данных из файла
+        Load from the file
 
         :param f_name: - имя файла
         :return: None
@@ -194,53 +207,4 @@ class IntDict(object):
 
 
 if __name__ == '__main__':
-    idict = IntDict()
-
-    from time_it import timeit
-
-    @timeit('')
-    def extend():
-        global idict
-        total_cnt = 1 * 10**1
-
-        import random
-        r_list = random.sample(range(1, total_cnt+1), total_cnt)
-        r_list = {i: i*10 for i in r_list}
-
-        # Filling
-        idict.extend(r_list)
-
-        # idict._sort()
-    extend()
-    #print(idict)
-    print('len=', len(idict))
-
-    # Search
-    s = 30
-    v = idict.get(s)
-    print(f'idict: search for k={s}: index={v}')
-
-    @timeit('')
-    def save_load():
-        # Saving and loading
-        f_name = 'aaa.bin'
-        idict.to_file(f_name)
-        idict.clear()
-        idict.from_file(f_name)
-    save_load()
-    # print(idict)
-
-    # Time tests
-    test_ses = 100
-
-    @timeit('')
-    def search():
-        for i in range(test_ses):
-            idict.get(300)
-    search()
-
-    def mem():
-        # Size in memory
-        from pympler import asizeof
-        print('size in memory: ', asizeof.asizeof(idict))
-    mem()
+    pass
