@@ -51,4 +51,5 @@ Type of data: only unsigned integer, 4 bytes
     print('test of dict: ', (datetime.datetime.now() - df).total_seconds())
 
     # Size in memory
+    from pympler import asizeof
     print('size in memory: ', asizeof.asizeof(idict), '/', asizeof.asizeof(d))
